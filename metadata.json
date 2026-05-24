@@ -1,0 +1,6 @@
+{
+  "name": "ShieldChat",
+  "description": "A secure Telegram clone featuring End-to-End Encryption and AI Smart Summaries.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

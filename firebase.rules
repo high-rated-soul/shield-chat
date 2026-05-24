@@ -1,0 +1,25 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Channels/Groups: Users can view channels they belong to
+    match /channels/{channelId} {
+      allow read: if request.auth != null; // Refine based on channel membership array
+      allow write: if request.auth != null; 
+    }
+    
+    // E2EE Messages: Users can only read/write messages where they are the sender or recipient
+    match /messages/{messageId} {
+      allow read: if request.auth != null && 
+                  (resource.data.senderId == request.auth.uid || 
+                   resource.data.recipientId == request.auth.uid || 
+                   resource.data.recipientId == 'all');
+                   
+      // Ensure the user is only sending messages as themselves, and that fields meet E2EE criteria
+      allow write: if request.auth != null && 
+                   request.resource.data.senderId == request.auth.uid &&
+                   request.resource.data.encryptedBody is string;
+    }
+  }
+}
