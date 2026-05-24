@@ -1,15 +1,12 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,19 +14,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.data.model.Channel
-import com.example.data.model.SmartSummary
 import com.example.ui.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+
+// Telegram Palette Mapping
+val TgBg = Color(0xFF17212B)
+val TgSurface = Color(0xFF202B36)
+val TgBlue = Color(0xFF5288C1)
+val TgTextMain = Color(0xFFFFFFFF)
+val TgTextSub = Color(0xFF7F91A4)
+val TgGreen = Color(0xFF45A675)
+
+// Local data structure for compiling UI elements
+data class TelegramUiChat(
+    val id: String,
+    val name: String,
+    val snippet: String,
+    val timestamp: String,
+    val unreadCount: Int,
+    val isGroup: Boolean
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,378 +47,241 @@ fun MainScreen(
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    var selectedTab by remember { mutableStateOf(0) }
-    
+    var currentTab by remember { mutableStateOf(0) } // 0 = Chats, 1 = Smart Feed
+    var focusModeActive by remember { mutableStateOf(false) }
+
+    // Mock representation of Telegram stream data fed from ViewModel later
+    val ongoingChats = remember {
+        listOf(
+            TelegramUiChat("c1", "Alex W.", "🔒 Cipher keys synchronized on-device.", "14:32", 0, false),
+            TelegramUiChat("c2", "Dev Alpha Channel", "New production build push ready to verify.", "14:15", 5, true),
+            TelegramUiChat("c3", "Kiran M.", "Are you checking the backend deployment tonight?", "12:04", 1, false),
+            TelegramUiChat("c4", "Global Logistics Group", "Corrugated shipments updating tracking schemas.", "10:45", 88, true),
+            TelegramUiChat("c5", "Sree", "🔒 Meet up to sign off the database specs.", "Yesterday", 0, false)
+        )
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
-                TelegramDrawerContent()
+            ModalDrawerSheet(
+                containerColor = TgSurface,
+                modifier = Modifier.width(290.dp)
+            ) {
+                // Telegram Standard Profile Drawer Header
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF1F2C3A))
+                        .padding(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(CircleShape)
+                            .background(TgBlue),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("S", color = TgTextMain, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("ShieldChat User", color = TgTextMain, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("@shield_chat_account", color = TgTextSub, fontSize = 13.sp)
+                }
+                HorizontalDivider(color = TgBg)
+                
+                // Drawer Options Matrix
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Group, contentDescription = null, tint = TgTextSub) },
+                    label = { Text("New Group", color = TgTextMain) },
+                    selected = false,
+                    onClick = {}
+                )
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Lock, contentDescription = null, tint = TgTextSub) },
+                    label = { Text("New Secret Chat", color = TgTextMain) },
+                    selected = false,
+                    onClick = {}
+                )
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Campaign, contentDescription = null, tint = TgTextSub) },
+                    label = { Text("New Channel", color = TgTextMain) },
+                    selected = false,
+                    onClick = {}
+                )
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = TgTextSub) },
+                    label = { Text("Settings", color = TgTextMain) },
+                    selected = false,
+                    onClick = {}
+                )
             }
         }
     ) {
         Scaffold(
             topBar = {
-                val title = when (selectedTab) {
-                    0 -> "ShieldChat"
-                    1 -> "Smart Summaries"
-                    else -> "Settings"
-                }
                 TopAppBar(
-                    title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(title, fontWeight = FontWeight.Medium, letterSpacing = (-0.5).sp)
-                            if (selectedTab == 0) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(Icons.Default.Lock, contentDescription = "Secure", tint = Color(0xFF2E7D32), modifier = Modifier.size(18.dp))
-                            }
-                        }
-                    },
+                    title = { Text("ShieldChat", fontWeight = FontWeight.SemiBold, color = TgTextMain) },
                     navigationIcon = {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Menu")
+                            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TgTextMain)
                         }
                     },
                     actions = {
-                        IconButton(onClick = { /* TODO */ }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        // Competitive Advantage Element: Focus Mode Switcher
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(end = 4.dp)
+                        ) {
+                            Text(
+                                text = "Focus Mode",
+                                fontSize = 11.sp,
+                                color = if (focusModeActive) TgBlue else TgTextSub,
+                                modifier = Modifier.padding(end = 2.dp)
+                            )
+                            Switch(
+                                checked = focusModeActive,
+                                onCheckedChange = { focusModeActive = it },
+                                colors = SwitchDefaults.colors(checkedThumbColor = TgBlue)
+                            )
+                        }
+                        IconButton(onClick = {}) {
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = TgTextMain)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                        actionIconContentColor = MaterialTheme.colorScheme.onSurface
-                    )
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = TgSurface)
                 )
-                // Divider border for TopAppBar
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
             },
             bottomBar = {
-                Column {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
-                    NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        tonalElevation = 0.dp
+                NavigationBar(containerColor = TgSurface) {
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Chat, contentDescription = null) },
+                        label = { Text("Chats") },
+                        selected = currentTab == 0,
+                        onClick = { currentTab = 0 }
+                    )
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                        label = { Text("Smart Feed") },
+                        selected = currentTab == 1,
+                        onClick = { currentTab = 1 }
+                    )
+                }
+            },
+            floatingActionButton = {
+                if (currentTab == 0) {
+                    FloatingActionButton(
+                        containerColor = TgBlue,
+                        contentColor = TgTextMain,
+                        onClick = {}
                     ) {
-                        NavigationBarItem(
-                            icon = { Icon(Icons.AutoMirrored.Filled.Message, contentDescription = "Chats") },
-                            label = { Text("Chats", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium) },
-                            selected = selectedTab == 0,
-                            onClick = { selectedTab = 0 },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        )
-                        NavigationBarItem(
-                            icon = { Icon(Icons.Default.AutoAwesome, contentDescription = "Smart Summaries") },
-                            label = { Text("Summaries", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium) },
-                            selected = selectedTab == 1,
-                            onClick = { selectedTab = 1 },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        )
-                        NavigationBarItem(
-                            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                            label = { Text("Settings", fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Medium) },
-                            selected = selectedTab == 2,
-                            onClick = { selectedTab = 2 },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        )
+                        Icon(Icons.Default.Edit, contentDescription = "Compose")
                     }
                 }
-            }
+            },
+            containerColor = TgBg
         ) { paddingValues ->
-            Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-                when (selectedTab) {
-                    0 -> ChatListScreen(viewModel, onNavigateToChat)
-                    1 -> SmartSummariesScreen(viewModel)
-                    2 -> SettingsPlaceholder()
-                }
-                
-                if (selectedTab == 0) {
-                    FloatingActionButton(
-                        onClick = { /* TODO */ },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(16.dp),
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        shape = CircleShape
-                    ) {
-                        Icon(Icons.Default.Edit, contentDescription = "New Message")
-                    }
-                } else if (selectedTab == 1) {
-                    FloatingActionButton(
-                        onClick = { /* TODO */ },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(16.dp),
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = "New Summary")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun TelegramDrawerContent() {
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Drawer Header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primary)
-                .padding(16.dp)
-        ) {
-            Column {
-                Spacer(modifier = Modifier.height(16.dp))
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("AI", fontSize = 24.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Jane Doe", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text("+1 (555) 123-4567", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f), fontSize = 14.sp)
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        DrawerItem(Icons.Default.GroupAdd, "New Group")
-        DrawerItem(Icons.Default.PersonAdd, "New Contact")
-        DrawerItem(Icons.Default.Campaign, "New Channel")
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
-        DrawerItem(Icons.Default.Contacts, "Contacts")
-        DrawerItem(Icons.Default.Call, "Calls")
-        DrawerItem(Icons.Default.Bookmark, "Saved Messages")
-        DrawerItem(Icons.Default.Settings, "Settings")
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
-        DrawerItem(Icons.Default.PersonAddAlt1, "Invite Friends")
-        DrawerItem(Icons.Default.HelpOutline, "Telegram FAQ")
-    }
-}
-
-@Composable
-fun DrawerItem(icon: ImageVector, title: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { }
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, contentDescription = title, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.width(32.dp))
-        Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-    }
-}
-
-@Composable
-fun ChatListScreen(viewModel: ChatViewModel, onNavigateToChat: (String, String, Boolean) -> Unit) {
-    val channels by viewModel.channels.collectAsStateWithLifecycle()
-    
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
-        items(channels) { channel ->
-            ChatListItem(channel, onClick = { onNavigateToChat(channel.id, channel.name, channel.isGroup) })
-        }
-    }
-}
-
-@Composable
-fun ChatListItem(channel: Channel, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(54.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.secondaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            val initials = channel.name.take(1).uppercase()
-            Text(initials, color = MaterialTheme.colorScheme.onSecondaryContainer, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        }
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(
-                    text = channel.name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                if (channel.isGroup) {
-                    Icon(Icons.Default.VolumeOff, contentDescription = "Muted", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                if (!channel.isGroup && channel.unreadCount == 0) {
-                    Icon(Icons.Default.PushPin, contentDescription = "Pinned", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                Text(
-                    text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(channel.timestamp)),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = channel.lastMessageSnippet,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 15.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                if (channel.unreadCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .padding(start = 8.dp)
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(channel.unreadCount.toString(), color = MaterialTheme.colorScheme.onPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SmartSummariesScreen(viewModel: ChatViewModel) {
-    val channels by viewModel.channels.collectAsStateWithLifecycle()
-    val summaries by viewModel.summaries.collectAsStateWithLifecycle()
-    
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            // Local Processing Banner
-            Row(
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .padding(16.dp),
-                verticalAlignment = Alignment.Top
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .background(TgBg)
             ) {
-                Icon(Icons.Default.Security, contentDescription = "Security", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp).offset(y = 2.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text("Local AI Processing Active", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text("Summaries are generated on-device. Your private chat data never leaves this phone.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f), lineHeight = 16.sp)
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("RECENT SUMMARIES", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, letterSpacing = 2.sp)
-                Box(modifier = Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.outline).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                    Text("${channels.size} Channels", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-        
-        items(channels) { channel ->
-            val channelSummary = summaries.find { it.channelId == channel.id }
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                val initials = channel.name.take(1).uppercase()
-                                Text(initials, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(channel.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
-                                Text("${channel.unreadCount} new messages", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                        
-                        Box(modifier = Modifier.width(64.dp).height(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.outline)) {
-                            Box(modifier = Modifier.fillMaxHeight().fillMaxWidth(if (channel.unreadCount > 20) 0.75f else 0.33f).background(MaterialTheme.colorScheme.primary))
-                        }
-                    }
+                if (currentTab == 0) {
+                    // Filter engine logic driven by Focus Mode state
+                    val clearFeed = if (focusModeActive) ongoingChats.filter { !it.isGroup } else ongoingChats
                     
-                    if (channelSummary == null) {
-                        TextButton(onClick = { viewModel.generateSummary(channel.id) }) {
-                            Text("Generate Summary")
-                        }
-                    } else {
-                        val bulletPoints = channelSummary.summaryText.split("\n").filter { it.isNotBlank() }
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            bulletPoints.forEach { point ->
-                                Row(verticalAlignment = Alignment.Top) {
-                                    Text("•", color = MaterialTheme.colorScheme.primary, fontSize = 14.sp, modifier = Modifier.padding(end = 8.dp))
-                                    Text(point.removePrefix("•").trim(), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurface)
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(clearFeed) { chat ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onNavigateToChat(chat.id, chat.name, chat.isGroup) }
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(52.dp)
+                                        .clip(CircleShape)
+                                        .background(if (chat.isGroup) Color(0xFFE4A652) else TgBlue),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(chat.name.take(1), color = TgTextMain, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(chat.name, color = TgTextMain, fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                                            if (!chat.isGroup) {
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Icon(Icons.Default.Lock, contentDescription = "E2EE Verified", tint = TgGreen, modifier = Modifier.size(13.dp))
+                                            }
+                                        }
+                                        Text(chat.timestamp, color = TgTextSub, fontSize = 11.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = chat.snippet,
+                                            color = TgTextSub,
+                                            fontSize = 13.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        if (chat.unreadCount > 0) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .padding(start = 6.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFF4EA4F6))
+                                                    .padding(horizontal = 7.dp, vertical = 1.dp)
+                                            ) {
+                                                Text(chat.unreadCount.toString(), color = TgTextMain, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
                                 }
                             }
+                            HorizontalDivider(color = Color(0xFF10171D), modifier = Modifier.padding(start = 80.dp))
+                        }
+                    }
+                } else {
+                    // Smart Feed Content Container Layout
+                    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = TgSurface),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = TgBlue, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("AI Digest Matrix", fontWeight = FontWeight.SemiBold, color = TgTextMain, fontSize = 15.sp)
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "• Dev Alpha Channel: Local 256-bit AES key-generation routines completed validation schemas.\n\n" +
+                                           "• Global Logistics Group: Supply chain manifests for container routing require structural data updates.",
+                                    color = TgTextSub,
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp
+                               )
+                            }
                         }
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun SettingsPlaceholder() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Settings Screen")
     }
 }
